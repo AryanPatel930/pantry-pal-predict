@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
-import { Upload, TrendingUp, AlertTriangle, Package, BarChart3 } from 'lucide-react';
+import { Upload, TrendingUp, AlertTriangle, Package, BarChart3, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import DataUpload from '@/components/DataUpload';
 import InventoryChart from '@/components/InventoryChart';
 import ForecastChart from '@/components/ForecastChart';
@@ -19,6 +19,11 @@ const Dashboard = () => {
     const processedData = processInventoryData(data);
     setInventoryData(processedData);
     setIsDataLoaded(true);
+  };
+
+  const handleUploadNew = () => {
+    setInventoryData([]);
+    setIsDataLoaded(false);
   };
 
   const processInventoryData = (data: InventoryData[]): ProcessedData[] => {
@@ -89,12 +94,29 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Smart Inventory Forecasting
-          </h1>
-          <p className="text-lg text-gray-600">
-            AI-powered inventory management for food businesses
-          </p>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex-1"></div>
+            <div className="flex-1 text-center">
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                Smart Inventory Forecasting
+              </h1>
+              <p className="text-lg text-gray-600">
+                AI-powered inventory management for food businesses
+              </p>
+            </div>
+            <div className="flex-1 flex justify-end">
+              {isDataLoaded && (
+                <Button 
+                  onClick={handleUploadNew}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Upload New Data
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {!isDataLoaded ? (
