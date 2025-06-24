@@ -49,7 +49,10 @@ const InventoryChart: React.FC<InventoryChartProps> = ({ data }) => {
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip 
               labelFormatter={(date) => new Date(date).toLocaleDateString()}
-              formatter={(value, name) => [value, name.replace('_inventory', '')]}
+              formatter={(value, name) => [
+                value, 
+                typeof name === 'string' ? name.replace('_inventory', '') : name
+              ]}
             />
             <Legend />
             {data.slice(0, 5).map((product, index) => (
