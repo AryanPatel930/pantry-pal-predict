@@ -1,5 +1,9 @@
+// src/pages/Dashboard.tsx
+
 import React, { useState } from 'react';
-import { Upload, TrendingUp, AlertTriangle, Package, BarChart3, RefreshCw } from 'lucide-react';
+import {
+  Upload, TrendingUp, AlertTriangle, Package, BarChart3, RefreshCw
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -9,16 +13,21 @@ import ForecastChart from '@/components/ForecastChart';
 import ProductTable from '@/components/ProductTable';
 import AlertsPanel from '@/components/AlertsPanel';
 import { InventoryData, ProcessedData } from '@/types/inventory';
+import { processAndForecastData } from '@/lib/api';
 
 const Dashboard = () => {
   const [inventoryData, setInventoryData] = useState<ProcessedData[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const handleDataUpload = (data: InventoryData[]) => {
-    // Process the uploaded data
-    const processedData = processInventoryData(data);
-    setInventoryData(processedData);
-    setIsDataLoaded(true);
+  const handleDataUpload = async (data: InventoryData[]) => {
+    try {
+      const result = await processAndForecastData(data);
+      setInventoryData(result);
+      setIsDataLoaded(true);
+    } catch (err) {
+      console.error("Failed to process uploaded data:", err);
+      alert("Error processing inventory data. Please try again.");
+    }
   };
 
   const handleUploadNew = () => {
@@ -26,68 +35,12 @@ const Dashboard = () => {
     setIsDataLoaded(false);
   };
 
-  const processInventoryData = (data: InventoryData[]): ProcessedData[] => {
-    const productMap = new Map<string, InventoryData[]>();
-    
-    // Group data by product
-    data.forEach(item => {
-      const key = item.productName;
-      if (!productMap.has(key)) {
-        productMap.set(key, []);
-      }
-      productMap.get(key)!.push(item);
-    });
-
-    // Process each product
-    return Array.from(productMap.entries()).map(([productName, items]) => {
-      const sortedItems = items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const totalSold = sortedItems.reduce((sum, item) => sum + item.sold, 0);
-      const avgDailySales = totalSold / sortedItems.length;
-      const lastInventory = sortedItems[sortedItems.length - 1]?.inventory || 0;
-      const daysOfStock = lastInventory / (avgDailySales || 1);
-      
-      // Simple trend calculation
-      const recentSales = sortedItems.slice(-7).reduce((sum, item) => sum + item.sold, 0) / 7;
-      const olderSales = sortedItems.slice(-14, -7).reduce((sum, item) => sum + item.sold, 0) / 7;
-      const trend = recentSales > olderSales ? 'up' : recentSales < olderSales ? 'down' : 'stable';
-
-      // Forecast next 7 days
-      const forecast = generateForecast(sortedItems, 7);
-
-      return {
-        productName,
-        data: sortedItems,
-        totalSold,
-        avgDailySales,
-        currentInventory: lastInventory,
-        daysOfStock,
-        trend,
-        forecast,
-        lowStockAlert: daysOfStock < 3,
-        overStockAlert: daysOfStock > 30
-      };
-    });
-  };
-
-  const generateForecast = (data: InventoryData[], days: number): number[] => {
-    if (data.length < 7) return Array(days).fill(0);
-    
-    const recentSales = data.slice(-14).map(item => item.sold);
-    const avgSales = recentSales.reduce((sum, sales) => sum + sales, 0) / recentSales.length;
-    
-    // Simple moving average with slight trend adjustment
-    const trend = data.slice(-7).reduce((sum, item) => sum + item.sold, 0) / 7 - 
-                  data.slice(-14, -7).reduce((sum, item) => sum + item.sold, 0) / 7;
-    
-    return Array(days).fill(0).map((_, index) => 
-      Math.max(0, Math.round(avgSales + (trend * 0.1 * index)))
-    );
-  };
-
   const totalProducts = inventoryData.length;
   const lowStockProducts = inventoryData.filter(item => item.lowStockAlert).length;
-  const totalValue = inventoryData.reduce((sum, item) => sum + (item.currentInventory * 10), 0); // Assuming $10 avg price
-  const avgTurnover = inventoryData.reduce((sum, item) => sum + (1 / (item.daysOfStock || 1)), 0) / totalProducts;
+  const totalValue = inventoryData.reduce((sum, item) => sum + (item.currentInventory * 10), 0); // $10 placeholder
+  const avgTurnover = inventoryData.length > 0
+    ? inventoryData.reduce((sum, item) => sum + (1 / (item.daysOfStock || 1)), 0) / totalProducts
+    : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -178,7 +131,7 @@ const Dashboard = () => {
               </Card>
             </div>
 
-            {/* Main Content */}
+            {/* Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -203,7 +156,7 @@ const Dashboard = () => {
               </TabsContent>
 
               <TabsContent value="alerts" className="space-y-6">
-                <AlertsPanel data={inventoryData} detailed={true} />
+                <AlertsPanel data={inventoryData} detailed />
               </TabsContent>
             </Tabs>
           </>
