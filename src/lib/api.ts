@@ -1,5 +1,3 @@
-// src/lib/api.ts
-
 import { InventoryData, ProcessedData } from '@/types/inventory';
 
 /**
@@ -7,12 +5,11 @@ import { InventoryData, ProcessedData } from '@/types/inventory';
  */
 function calculateTrend(data: InventoryData[]): "up" | "down" | "stable" {
   if (data.length < 14) return "stable";
-  
-  const sortedData = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
+
+  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const recentSales = sortedData.slice(-7).reduce((sum, item) => sum + item.sold, 0) / 7;
   const olderSales = sortedData.slice(-14, -7).reduce((sum, item) => sum + item.sold, 0) / 7;
-  
+
   if (recentSales > olderSales * 1.1) return "up";
   if (recentSales < olderSales * 0.9) return "down";
   return "stable";
@@ -31,7 +28,6 @@ export async function processAndForecastData(data: InventoryData[]): Promise<Pro
   }));
 
   const grouped: { [productName: string]: any[] } = {};
-
   formatted.forEach(entry => {
     const name = entry['Product Name'];
     if (!grouped[name]) grouped[name] = [];
@@ -51,7 +47,7 @@ export async function processAndForecastData(data: InventoryData[]): Promise<Pro
         const res = await fetch('https://ai-forecast-backend.onrender.com/forecast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: salesData, product_name: productName }),
+          body: JSON.stringify({ sales_data: salesData, product_name: productName }), // corrected keys
         });
 
         if (!res.ok) throw new Error(`Forecast API call failed with status: ${res.status}`);
@@ -77,10 +73,7 @@ export async function processAndForecastData(data: InventoryData[]): Promise<Pro
         };
       } catch (err) {
         console.error(`Forecast error for ${productName}:`, err);
-        
-        // Generate fallback local forecast
         const fallbackForecast = generateLocalForecast(productData, 7);
-        
         return {
           productName,
           data: productData,
@@ -107,16 +100,14 @@ export async function processAndForecastData(data: InventoryData[]): Promise<Pro
  */
 function generateLocalForecast(data: InventoryData[], days: number): number[] {
   if (data.length < 7) return Array(days).fill(0);
-  
-  const sortedData = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const recentSales = sortedData.slice(-14).map(item => item.sold);
   const avgSales = recentSales.reduce((sum, sales) => sum + sales, 0) / recentSales.length;
-  
-  // Simple moving average with slight trend adjustment
-  const trendAdjustment = sortedData.slice(-7).reduce((sum, item) => sum + item.sold, 0) / 7 - 
-                         sortedData.slice(-14, -7).reduce((sum, item) => sum + item.sold, 0) / 7;
-  
-  return Array(days).fill(0).map((_, index) => 
+  const trendAdjustment = sortedData.slice(-7).reduce((sum, item) => sum + item.sold, 0) / 7 -
+                          sortedData.slice(-14, -7).reduce((sum, item) => sum + item.sold, 0) / 7;
+
+  return Array(days).fill(0).map((_, index) =>
     Math.max(0, Math.round(avgSales + (trendAdjustment * 0.1 * index)))
   );
 }
